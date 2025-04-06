@@ -349,4 +349,4 @@ class LTLSynthesizedControllerV3(BaseController):
 
         elif fsm_state == 'Touchdown':
             # Once landed, no further action is needed.
-            return 0
+            return 'terminate'

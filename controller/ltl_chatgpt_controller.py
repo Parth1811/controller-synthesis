@@ -1,7 +1,7 @@
 from .controller import BaseController
 
 
-class LTLSynthesizedController(BaseController):
+class ChatGPTExtendedPromptController(BaseController):
 
     def __init__(self, env):
         super().__init__(env)
@@ -102,7 +102,7 @@ class LTLSynthesizedController(BaseController):
 
         elif fsm_state == 'Touchdown':
             # Once landed, no further action is necessary.
-            return 'terminate'
+            return 0
 
     # Optional: Verification routines to validate that the synthesized controller meets the LTL specifications.
     # One simple strategy is to run a batch of simulated episodes, log the trajectories, and then verify
@@ -139,7 +139,7 @@ class LTLSynthesizedController(BaseController):
     #     return True  # Placeholder
 
 
-class LTLSynthesizedControllerV2(BaseController):
+class ChatGPTExtendedPromptControllerV2(BaseController):
     def __init__(self, env):
         super().__init__(env)
         # Define thresholds for the atomic propositions
@@ -243,7 +243,7 @@ class LTLSynthesizedControllerV2(BaseController):
             # Once landed, no further action is necessary.
             return 0
 
-class LTLSynthesizedControllerV3(BaseController):
+class ChatGPTExtendedPromptControllerV3(BaseController):
     def __init__(self, env):
         super().__init__(env)
         # Define thresholds for the atomic propositions and safety bounds.
@@ -349,4 +349,4 @@ class LTLSynthesizedControllerV3(BaseController):
 
         elif fsm_state == 'Touchdown':
             # Once landed, no further action is needed.
-            return 'terminate'
+            return 0

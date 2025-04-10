@@ -1,7 +1,7 @@
 from .controller import BaseController
 
 
-class LTLSafeController(BaseController):
+class ChatGPTController(BaseController):
     def __init__(self, env):
         # Safety threshold constants (based on LTL specs and environment limits)
         self.MAX_TILT = 0.4        # maximum allowed tilt angle in radians (~22°) to avoid flip
@@ -18,7 +18,7 @@ class LTLSafeController(BaseController):
 
         # If already landed (both legs on ground) and nearly zero velocity, keep engines off (stay landed).
         if leg1 and leg2 and v_y >= -self.SAFE_DESCENT_SPEED and abs(v_x) < 1e-1:
-            return 'terminate'  # Safe touchdown achieved, no further action
+            return 0  # Safe touchdown achieved, no further action
 
         # Enforce horizontal bounds (LTL: G |x| < 1).
         if x > self.MAX_X:

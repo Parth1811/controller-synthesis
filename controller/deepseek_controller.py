@@ -1,7 +1,7 @@
 from .controller import BaseController
 
 
-class LunarLanderController(BaseController):
+class DeepSeekController(BaseController):
     def __init__(self, env):
         super().__init__(env)
         # Initialize any additional variables or parameters here

@@ -5,7 +5,7 @@ import numpy as np
 from .controller import BaseController
 
 
-class LTLLunarLanderController(BaseController):
+class ClaudeController(BaseController):
     def __init__(self, env):
         """
         Controller for the Lunar Lander environment guided by LTL specifications.
@@ -68,7 +68,7 @@ class LTLLunarLanderController(BaseController):
         # Check if we've landed (both legs in contact)
         landed = left_contact and right_contact
         if landed:
-            return 'terminate'  # Do nothing if landed
+            return 0  # Do nothing if landed
 
         # Calculate control errors
         # For altitude: keep positive but aim to reach 0

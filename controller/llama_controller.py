@@ -3,7 +3,7 @@ import numpy as np
 from .controller import BaseController
 
 
-class LlamaLunarLanderController(BaseController):
+class LlamaController(BaseController):
 
     def __init__(self, env):
         """

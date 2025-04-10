@@ -4,9 +4,25 @@ from controller import *
 
 # Initialise the environment
 env = gym.make("LunarLander-v3", render_mode="human")
-controller = TulipLunarLanderController(env)
 
-for i in range(10):
+
+# controller = LTLSafeController(env)
+# controller = LTLLunarLanderController(env)
+# controller = LunarLanderController(env)
+# controller = LlamaLunarLanderController(env)
+# controller = LTLSynthesizedControllerV2(env)
+controller = LTLSynthesizedControllerV3(env)
+# controller = LTLSynthesizedController(env)
+# controller = RandomActionController(env)
+# controller = TulipLunarLanderController(env)
+# controller = RandomActionController(env)
+# controller = TulipLunarLanderController(env)
+
+
+
+sucess = 0
+NO_OF_ITER = 10
+for i in range(NO_OF_ITER):
     print("----" * 20)
     print(f"Starting episode {i + 1}")
 
@@ -25,13 +41,20 @@ for i in range(10):
                   f"av={' ' if observation[5] >= 0 else ''}{observation[5]:.2f}, "
                   f"lleg={observation[6]}, rleg={observation[7]}")
 
-        if action == 'terminate':
-            print(" ==============")
-            print("Terminating episode.")
-            print("Final Observation: ", observation)
-            print(" ==============")
-            break
-
         # step (transition) through the environment with the action
         # receiving the next observation, reward and if the episode has terminated or truncated
         observation, reward, terminated, truncated, info = env.step(action)
+
+        if truncated or terminated:
+            print(" ==============")
+            print("Terminating episode.")
+            print("Final Observation: ", observation)
+            print("Final Reward: ", reward)
+            print(" ==============")
+
+            if reward >= 200:
+                sucess += 1
+
+            break
+
+    print("Success rate: ", sucess * 10000 // NO_OF_ITER / 100 )

@@ -34,90 +34,95 @@ from .controller import BaseController
 class TulipLunarLanderController(BaseController):
     def __init__(self, env):
         super().__init__(env)
-        # Thresholds for mapping the continuous state to Boolean propositions.
-        self.x_threshold = 0.4         # For being over the pad (p)
-        self.angle_threshold = 0.1     # For nearly upright (q)
-        self.vx_threshold = 0.1        # For safe horizontal speed (r)
-        self.vy_threshold = 1          # For safe vertical descent (r)
-        self.angular_vel_threshold = 0.1  # For safe angular velocity (a)
-        self.y_threshold = 0.3         # For near_ground condition
+        # thresholds for p, q, r, near_ground
+        self.x_th   = 0.1
+        self.ang_th = 0.1
+        self.vx_th  = 0.1
+        self.vy_th  = 2.0
+        self.y_th   = 0.2
 
-        # ---------------------------------------------------------------------
-        # Build the GR(1) specification using tulip.
-        # ---------------------------------------------------------------------
-        env_vars = {
-            'p': 'bool',          # Lander is over the pad
-            'q': 'bool',          # Lander is nearly upright
-            'r': 'bool',          # Lander’s linear velocities are safe
-            'a': 'bool',          # Lander’s angular velocity is bounded
-            's': 'bool',          # Both landing legs are in contact
-            'near_ground': 'bool',# Lander is near the ground
-            'crash': 'bool'       # Crash event detected
+        # save env var names
+        self.input_vars = ['p', 'q', 'r', 'near_ground']
+
+        # build and synthesize the GR(1) spec (same as before)
+        env_vars = self.input_vars[:]
+        sys_vars = [
+            'do_nothing','fire_left','fire_main','fire_right',
+            'landing_pending','landed'
+        ]
+        env_init = set()
+        sys_init = set()
+        stable = 'near_ground && p && q && r'
+        env_safe = set()
+        sys_safety = {
+            f'({stable} && !landing_pending && !landed) -> X(landing_pending)',
+            '(landing_pending && !landed) -> X(landing_pending)',
+            f'(landing_pending && {stable}) -> X(landed)',
+            'landed -> X(!landing_pending)',
+            'landed -> X(landed)',
+            '(do_nothing || fire_left || fire_main || fire_right)',
+            '!(do_nothing && fire_left)', '!(do_nothing && fire_main)', '!(do_nothing && fire_right)',
+            '!(fire_left && fire_main)',    '!(fire_left && fire_right)',
+            '!(fire_main && fire_right)'
         }
-        sys_vars = {
-            'action': (0, 1, 2, 3)  # 0: none, 1: left, 2: main, 3: right
-        }
-        # Environment assumptions
-        env_init = ['!crash']
-        env_safe = ['!crash']
-        env_prog = []  # (No liveness assumptions on the environment)
-        # System guarantees
-        sys_init = []  # (No particular initial system output required)
-        sys_safe = ['!crash']  # Always avoid a crash
-        # The system must eventually reach a safe landing condition.
-        sys_prog = ['p && q && r && a && s']
+        env_prog = {stable}
+        sys_prog = {'landed'}
 
-        gr1_spec = spec.GRSpec(env_vars, sys_vars, env_init, sys_safe, env_prog, sys_prog)
-        gr1_spec.moore = False  # Use a Moore machine (output depends only on current state)
-        gr1_spec.plus_one = False  # Use a non-deterministic controller
-        gr1_spec.qinit = r'\A \E'
-        self.discrete_ctrl = synth.gr1c.synthesize(gr1_spec)
-        if self.discrete_ctrl is None:
-            raise RuntimeError("Tulip synthesis failed: Specification unrealizable!")
-        print("Tulip discrete controller synthesized successfully!")
-        # Initialize the discrete controller's current state.
-        self.current_discrete_state = self.discrete_ctrl.initial_state
+        specs = spec.GRSpec(
+            env_vars=env_vars,
+            sys_vars=sys_vars,
+            env_init=env_init,
+            sys_init=sys_init,
+            env_safety=env_safe,
+            sys_safety=sys_safety,
+            env_prog=env_prog,
+            sys_prog=sys_prog
+        )
+        specs.moore = True
+        specs.qinit = r'\A \E'
+        self.controller = synth.synthesize(specs)
+        if self.controller is None:
+            raise RuntimeError("Unrealizable spec")
+        self.current_state = 0
 
-    def _get_env_props(self, state):
-        """
-        Map the continuous state of Lunar Lander into Boolean propositions expected
-        by the discrete controller.
-        The continuous state is assumed to be:
-        [x, y, vx, vy, angle, angular_vel, left_contact, right_contact]
-        """
-        x, y, vx, vy, angle, angular_vel, left_contact, right_contact = state
-
-        props = dict()
-        props['p'] = abs(x) <= self.x_threshold
-        props['q'] = abs(angle) <= self.angle_threshold
-        # For r: ensure horizontal speed is small and descent is not too fast.
-        props['r'] = (abs(vx) <= self.vx_threshold) and (vy >= -self.vy_threshold)
-        props['a'] = abs(angular_vel) <= self.angular_vel_threshold
-        props['s'] = (left_contact == 1 and right_contact == 1)
-        props['near_ground'] = (y <= self.y_threshold)
-        # For this example, we assume the environment never signals a crash.
-        props['crash'] = False
-        return props
+    def _get_atomic_propositions(self, obs):
+        # obs = [x, y, vx, vy, angle, ang_vel, left_contact, right_contact]
+        x, y, vx, vy, ang, ang_vel, lc, rc = obs
+        p = abs(x) <= self.x_th
+        q = abs(ang) <= self.ang_th
+        r = abs(vx) <= self.vx_th and abs(vy) <= self.vy_th
+        near_ground = y <= self.y_th
+        return {'p': p, 'q': q, 'r': r, 'near_ground': near_ground}
 
     def control(self, observation):
-        """
-        Query the current state of the environment, map it to Boolean propositions,
-        and use the synthesized Tulip discrete controller to obtain the next action.
-        """
-        # Retrieve the current continuous state.
-        state = observation
-        props = self._get_env_props(state)
-        # Use the discrete controller's transition function.
-        # NOTE: The synthesized controller is a finite state machine. In this example, we
-        # assume that it provides a helper function "step" that, given the current discrete state
-        # and the environment's Boolean inputs, returns a tuple (next_state, output).
-        #
-        # This "step" method is not provided by tulip by default, so you would typically
-        # write a small wrapper to simulate the transition based on self.discrete_ctrl.transitions.
-        # Here we assume that such a function exists.
-        self.current_discrete_state, output = self.discrete_ctrl.step(self.current_discrete_state, props)
-        if props['s']:
-            # If the landing condition is satisfied, we can stop the episode.
-            return 'terminate'
+        # 1) Map continuous obs → boolean props
+        props = self._get_atomic_propositions(observation)
 
-        return output['action']
+        # 2) Look up all transitions from the current discrete state
+        #    MealyMachine.transitions.find(state) returns
+        #    a list of (src_state, dst_state, valuation) tuples :contentReference[oaicite:0]{index=0}
+        trans_list = self.controller.transitions.find(self.current_state)
+
+        # 3) Find the transition whose env‐vars in valuation match props
+        for (src, dst, valuation) in trans_list:
+            if all(valuation[var] == props[var] for var in self.input_vars):
+                next_state = dst
+                out_vals = valuation
+                break
+        else:
+            raise ValueError(f"No valid transition from state {self.current_state} with props {props}")
+
+        # 4) Advance the FSM state
+        self.current_state = next_state
+
+        # 5) Decode one‑hot action from out_vals
+        if out_vals['do_nothing']:
+            return 0
+        if out_vals['fire_left']:
+            return 1
+        if out_vals['fire_main']:
+            return 2
+        if out_vals['fire_right']:
+            return 3
+
+        raise RuntimeError("Controller produced no valid action")

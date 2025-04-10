@@ -4,7 +4,7 @@ from controller import *
 
 # Initialise the environment
 env = gym.make("LunarLander-v3", render_mode="human")
-controller = LlamaLunarLanderController(env)
+controller = TulipLunarLanderController(env)
 
 for i in range(10):
     print("----" * 20)
